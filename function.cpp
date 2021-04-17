@@ -37,6 +37,26 @@ const int tableP[32] = {16, 7, 20, 21, 29, 12, 28, 17,
                         2, 8, 24, 14, 32, 27, 3, 9,
                         19, 13, 30, 6, 22, 11, 4, 25};
 
+const int tableLoop[16] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
+
+const int tablePC1[56] = {57, 49, 41, 33, 25, 17, 9,
+                          1, 58, 50, 42, 34, 26, 18,
+                          10, 2, 59, 51, 43, 35, 27,
+                          19, 11, 3, 60, 52, 44, 36,
+                          63, 55, 47, 39, 31, 23, 15,
+                          7, 62, 54, 46, 38, 30, 22,
+                          14, 6, 61, 53, 45, 37, 29,
+                          21, 13, 5, 28, 20, 12, 4};
+
+const int tablePC2[48] = {14, 17, 11, 24, 1, 5,
+                          3, 28, 15, 6, 21, 10,
+                          23, 19, 12, 4, 26, 8,
+                          16, 7, 27, 20, 13, 2,
+                          41, 52, 31, 37, 47, 55,
+                          30, 40, 51, 45, 33, 48,
+                          44, 49, 39, 56, 34, 53,
+                          46, 42, 50, 36, 29, 32};
+
 const int s1[4][16] = {
         {14, 4,  13, 1, 2,  15, 11, 8,  3,  10, 6,  12, 5,  9,  0, 7},
         {0,  15, 7,  4, 14, 2,  13, 1,  10, 6,  12, 11, 9,  5,  3, 8},
@@ -80,17 +100,22 @@ const int s7[4][16] = {
         {6,  11, 13, 8,  1,  4, 10, 7,  9,  5,  0, 15, 14, 2,  3, 12}
 };
 const int s8[4][16] = {
-        {13, 2, 8, 4, 6, 15, 11, 1, 10, 9, 3, 14, 5, 0, 12, 7},
-        {1, 15, 13, 8, 10, 3, 7, 4, 12, 5, 6, 11, 0, 14, 9, 2},
-        {7, 11, 4, 1, 9, 12, 14, 2, 0, 6, 10, 13, 15, 3, 5, 8},
-        {2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11}
+        {13, 2,  8,  4, 6,  15, 11, 1,  10, 9,  3,  14, 5,  0,  12, 7},
+        {1,  15, 13, 8, 10, 3,  7,  4,  12, 5,  6,  11, 0,  14, 9,  2},
+        {7,  11, 4,  1, 9,  12, 14, 2,  0,  6,  10, 13, 15, 3,  5,  8},
+        {2,  1,  14, 7, 4,  10, 8,  13, 15, 12, 9,  0,  3,  5,  6,  11}
 };
 
 
 const unsigned char maskTable[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
+
 unsigned char text[8] = {0x02, 0x46, 0x8a, 0xce, 0xec, 0xa8, 0x64, 0x20};
 
-unsigned char key[7] = {0x0f, 0x15, 0x71, 0xc9, 0x47, 0xd9, 0xe8};
+unsigned char secretKey[8] = {0x0f, 0x15, 0x71, 0xc9, 0x47, 0xd9, 0xe8, 0x59};
+
+unsigned char seedKey[7];
+
+unsigned char roundKey[16][6];
 
 
 void Encrypt() {
@@ -102,16 +127,23 @@ void Encrypt() {
 }
 
 void IP() {
-    unsigned char backup[8];
-    for (int i = 0; i < 8; ++i) {
-        backup[i] = text[i];
+    replaceBit(text, 8, tableIP);
+}
+
+void converseIP() {
+    replaceBit(text, 8, tableConverseIP);
+}
+
+//按照置换表对t进行置换
+void replaceBit(unsigned char *t, int size, const int *table) {
+    unsigned char backup[size];
+    for (int i = 0; i < size; ++i) {
+        backup[i] = t[i];
     }
 
-    for (int i = 0; i < 64; ++i)
-        if (!compare(i, tableIP[i] - 1, backup))
-            toggle(i);
-
-
+    for (int i = 0; i < (8 * size); ++i)
+        if (!compare(i, table[i] - 1, backup))
+            toggle(i, t);
 }
 
 //比较两个位上的数是否相等
@@ -128,38 +160,79 @@ bool compare(int a, int b, const unsigned char *backup) {
 }
 
 //切换该位
-void toggle(int a) {
+void toggle(int a, unsigned char *t) {
     int i = a / 8;
     int j = a % 8;
-    text[i] = text[i] ^ maskTable[j];
-}
-
-
-void converseIP() {
-    unsigned char backup[8];
-    for (int i = 0; i < 8; ++i) {
-        backup[i] = text[i];
-    }
-
-    for (int i = 0; i < 64; ++i)
-        if (!compare(i, tableConverseIP[i] - 1, backup))
-            toggle(i);
-
+    t[i] = t[i] ^ maskTable[j];
 }
 
 void roundFunction() {
+    unsigned char temp[6] = {0};
+    Expansion(&text[4], temp);
     //Expansion
     //Sbox
     //P replace
 }
 
+void Expansion(const unsigned char *R, unsigned char *temp) {
+    for (int i = 0; i < 4; ++i)
+        temp[i] = R[i];
+
+    replaceBit(temp, 6, tableE);
+}
+
+//生成16轮的轮密钥
 void keyExtension() {
+    //将64位密钥根据PC-1生成56为种子密钥 为C0D0
+    initSeedKey();
+
+    for (int i = 0; i < 16; ++i) {
+        loopKey(i); //移位
+
+    }
 
 }
 
-void printText() {
-    for (int i = 0; i < 8; ++i) {
-        printf("%#x ", text[i]);
+void initSeedKey() {
+    replaceBit(secretKey, 8, tablePC1);
+    for (int i = 0; i < 7; ++i) {
+        seedKey[i] = secretKey[i];
     }
+}
+
+//根据移位表确定每轮的移位
+void loopKey(int round) {
+    loop(tableLoop[round]);
+}
+
+void loop(int num) {
+    int cpl = 8 - num;
+    unsigned char foo[7];
+    for (int i = 0; i < 7; ++i)
+        foo[i] = seedKey[i];
+    seedKey[0] = (foo[0] << num) | (foo[1] >> cpl);
+    seedKey[1] = (foo[1] << num) | (foo[2] >> cpl);
+    seedKey[2] = (foo[2] << num) | (foo[3] >> cpl);
+    seedKey[3] = (foo[3] >> 4 << (4 + num)) | (foo[0] >> cpl << 4) | (foo[3] << (4 + num) >> 4) | (foo[4] >> cpl);
+    seedKey[4] = (foo[4] << num) | (foo[5] >> cpl);
+    seedKey[5] = (foo[5] << num) | (foo[6] >> cpl);
+    seedKey[6] = (foo[6] << num) | (foo[3] << 4 >> cpl);
+
+}
+
+void transPC2(int round) {
+    unsigned char temp[7];
+    for (int i = 0; i < 7; ++i)
+        temp[i] = seedKey[i];
+    replaceBit(temp, 7, tablePC2);
+    for (int i = 0; i < 6; ++i) {
+        roundKey[round][i] = temp[i];
+    }
+}
+
+void printText() {
+    for (int i = 0; i < 8; ++i)
+        printf("%#x ", text[i]);
+
     printf("\n");
 }

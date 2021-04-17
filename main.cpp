@@ -8,7 +8,7 @@ int main() {
 //    toggle(i);
 //    printf("%#x",text[i/8]);
     IP();
-  //  converseIP();
+    converseIP();
     printText();
     return 0;
 }
